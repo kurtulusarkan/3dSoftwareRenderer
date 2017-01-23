@@ -22,6 +22,13 @@ public class TGAImage {
     int height;
     int bytesPerPixel;
 
+    public TGAImage(int width, int height, int bytesPerPixel) {
+        this.width = width;
+        this.height = height;
+        this.bytesPerPixel = bytesPerPixel;
+        this.data = new byte[width * height * bytesPerPixel];
+    }
+
     private TGAImage(TGAHeader header, ByteBuffer byteBuffer) {
 
         this.width = header.width;
@@ -53,6 +60,69 @@ public class TGAImage {
             default:
                 throw new RuntimeException("Unsupported file format. (i.e. compressed/color-mapped tga files.)");
         }
+
+        if (!((header.imageDescriptor & 0x20) > 0)) {
+            flipVertically();
+        }
+        if ((header.imageDescriptor & 0x10) > 0) {
+            flipHorizontally();
+        }
+    }
+
+    public TGAColor get(int x, int y) {
+        if (data == null || x < 0 || y < 0 || x >= width || y >= height) {
+            return new TGAColor();
+        }
+        int begin = (x + y * width) * bytesPerPixel;
+        int end = begin + bytesPerPixel;
+        byte[] color = Arrays.copyOfRange(data, begin, end);
+        return new TGAColor(color, bytesPerPixel);
+    }
+
+    public void set(int x, int y, TGAColor color) {
+        if (data == null || x < 0 || y < 0 || x >= width || y >= height)
+            return;
+        int begin = (x + y * width) * bytesPerPixel;
+        System.arraycopy(color.color, 0, data, begin, bytesPerPixel);
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public int getBytesPerPixel() {
+        return bytesPerPixel;
+    }
+
+    public void flipHorizontally() {
+
+        int half = width >> 1;
+        for (int i = 0; i < half; i++) {
+            for (int j = 0; j < height; j++) {
+                TGAColor c1 = get(i, j);
+                TGAColor c2 = get(width - 1 - i, j);
+                set(i, j, c2);
+                set(width - 1 - i, j, c1);
+            }
+        }
+    }
+
+    public void flipVertically() {
+
+        int bytesPerLine = width * bytesPerPixel;
+        byte[] line = new byte[bytesPerLine];
+        int half = height >> 1;
+        for (int j = 0; j < half; j++) {
+            int l1 = j * bytesPerLine;
+            int l2 = (height - 1 - j) * bytesPerLine;
+            System.arraycopy(data, l1, line, 0, bytesPerLine);
+            System.arraycopy(data, l2, data, l1, bytesPerLine);
+            System.arraycopy(line, 0, data, l2, bytesPerLine);
+        }
     }
 
     private void decodeRLE(ByteBuffer byteBuffer) {
@@ -63,18 +133,21 @@ public class TGAImage {
         int currentByte = 0;
 
         do {
+
             int chunkHeader = byteBuffer.get() & 0xFF;
 
             if (chunkHeader < MAX_CHUNK_LENGTH) {
-                chunkHeader++;
 
+                chunkHeader++;
                 for (int i = 0; i < chunkHeader; i++) {
                     for (int t = 0; t < bytesPerPixel; t++) {
                         data[currentByte++] = byteBuffer.get();
                     }
                     currentPixel++;
                 }
+
             } else {
+
                 chunkHeader -= 127;
                 byte[] colorBuffer = new byte[bytesPerPixel];
                 byteBuffer.get(colorBuffer);
@@ -111,16 +184,16 @@ public class TGAImage {
 
         byte[] developerAreaRef = new byte[4];
         byte[] extensionAreaRef = new byte[4];
-        byte[] footer = {'T','R','U','E','V','I','S','I','O','N','-','X','F','I','L','E','.','\0'};
+        byte[] footer = {'T', 'R', 'U', 'E', 'V', 'I', 'S', 'I', 'O', 'N', '-', 'X', 'F', 'I', 'L', 'E', '.', '\0'};
 
         byte dataTypeCode = bytesPerPixel == TGAHeader.BBP_GRAYSCALE ?
                 (runLengthEncoded ? TGAHeader.DTC_RLE_GRAYSCALE : TGAHeader.DTC_UNCOMPRESSED_GRAYSCALE) :
                 (runLengthEncoded ? TGAHeader.DTC_RLE_TRUECOLOR : TGAHeader.DTC_UNCOMPRESSED_TRUECOLOR);
 
-        byte bitsPerPixel = (byte)(bytesPerPixel << 3);
+        byte bitsPerPixel = (byte) (bytesPerPixel << 3);
         byte imageDescriptor = 0x20;
 
-        TGAHeader header = new TGAHeader((short)width, (short)height, bitsPerPixel, dataTypeCode, imageDescriptor);
+        TGAHeader header = new TGAHeader((short) width, (short) height, bitsPerPixel, dataTypeCode, imageDescriptor);
 
         FileOutputStream fileOut = new FileOutputStream(fileName);
 
@@ -129,7 +202,7 @@ public class TGAImage {
         if (!runLengthEncoded) {
             fileOut.write(data);
         } else {
-            writeRunLenghtEncoded(fileOut);
+            writeRunLengthEncoded(fileOut);
         }
 
         fileOut.write(developerAreaRef);
@@ -139,7 +212,7 @@ public class TGAImage {
         fileOut.close();
     }
 
-    private void writeRunLenghtEncoded(FileOutputStream fileOut) throws IOException {
+    private void writeRunLengthEncoded(FileOutputStream fileOut) throws IOException {
 
         int pixelCount = width * height;
         int currentPixel = 0;
@@ -149,36 +222,83 @@ public class TGAImage {
             int chunkStart = currentPixel * bytesPerPixel;
             int currentByte = currentPixel * bytesPerPixel;
             int runLength = 1;
-
             boolean raw = true;
 
             while (currentPixel + runLength < pixelCount && runLength < MAX_CHUNK_LENGTH) {
 
-                boolean successEqual = true;
-                for (int t = 0; successEqual && t < bytesPerPixel; t++) {
-                    successEqual = (data[currentByte + t] == data[currentByte + t + bytesPerPixel]);
+                boolean equalPixel = true;
+                for (int t = 0; t < bytesPerPixel; t++) {
+                    equalPixel = (data[currentByte + t] == data[currentByte + t + bytesPerPixel]);
+                    if (!equalPixel) {
+                        break;
+                    }
                 }
 
                 currentByte += bytesPerPixel;
 
                 if (1 == runLength) {
-                    raw = !successEqual;
+                    raw = !equalPixel;
                 }
-                if (raw && successEqual) {
+                if (raw && equalPixel) {
                     runLength--;
                     break;
                 }
-                if (!raw && !successEqual) {
+                if (!raw && !equalPixel) {
                     break;
                 }
 
                 runLength++;
-                currentPixel += runLength;
+            }
 
-                fileOut.write(raw ? runLength - 1 : runLength + 127);
-                fileOut.write(Arrays.copyOfRange(data, chunkStart, chunkStart + (raw ? (runLength*bytesPerPixel):bytesPerPixel)));
+            currentPixel += runLength;
+            int chunkHeader = raw ? (runLength - 1) : (runLength + 127);
+            int bytesToCopy = raw ? (runLength * bytesPerPixel) : bytesPerPixel;
+            fileOut.write(chunkHeader);
+            fileOut.write(Arrays.copyOfRange(data, chunkStart, chunkStart + bytesToCopy));
+        }
+    }
+
+    public void scale(int newWidth, int newHeight) {
+
+        if (newHeight < 0 || newWidth < 0)
+            return;
+
+        byte[] newData = new byte[newHeight * newWidth * bytesPerPixel];
+
+        int nScanLine = 0;
+        int oScanLine = 0;
+        int errY = 0;
+
+        int nLineBytes = newWidth * bytesPerPixel;
+        int oLineBytes = width * bytesPerPixel;
+
+        for (int j = 0; j < height; j++) {
+            int errx = width - newWidth;
+            int nx = -bytesPerPixel;
+            int ox = -bytesPerPixel;
+            for (int i = 0; i < width; i++) {
+                ox += bytesPerPixel;
+                errx += newWidth;
+                while (errx >= width) {
+                    errx -= width;
+                    nx += bytesPerPixel;
+                    System.arraycopy(data, oScanLine + ox, newData, nScanLine + nx, bytesPerPixel);
+                }
+            }
+            errY += newHeight;
+            oScanLine += oLineBytes;
+            while (errY >= height) {
+                if (errY >= height << 1) { // it means we jump over a scanline
+                    System.arraycopy(newData, nScanLine, newData, nScanLine + nLineBytes, nLineBytes);
+                }
+                errY -= height;
+                nScanLine += nLineBytes;
             }
         }
+
+        data = newData;
+        width = newWidth;
+        height = newHeight;
     }
 
     @Override

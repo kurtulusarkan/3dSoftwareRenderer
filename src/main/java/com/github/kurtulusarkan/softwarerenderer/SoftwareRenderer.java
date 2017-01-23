@@ -12,7 +12,10 @@ public class SoftwareRenderer {
     public static void main(String[] args) throws IOException {
 
         // testing tga file read/write ops.
-        TGAImage image = TGAImage.readTGAImageFromFile("data/grid.tga");
+        TGAImage image = TGAImage.readTGAImageFromFile("data/floor_diffuse.tga");
+        image.scale(1200, 800);
+        image.flipHorizontally();
+        image.flipVertically();
         image.writeToFile("output1.tga", false);
         image.writeToFile("output2.tga", true);
     }
