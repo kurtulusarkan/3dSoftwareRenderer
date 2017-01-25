@@ -309,4 +309,46 @@ public class TGAImage {
                 ", bytesPerPixel=" + bytesPerPixel +
                 '}';
     }
+
+    public void drawLine(int x1, int y1, int x2, int y2, TGAColor color) {
+        boolean steep = false;
+        if (Math.abs(x1 - x2) < Math.abs(y1 - y2)) {
+            int t = x1;
+            x1 = y1;
+            y1 = t;
+            //Math.swap(x1, y1);
+            t = x2;
+            x2 = y2;
+            y2 = t;
+            //Math.swap(x2, y2);
+            steep = true;
+        }
+        if (x1 > x2) {
+            int t = x1;
+            x1 = x2;
+            x2 = t;
+            //Math.swap(x1, x2);
+            t = y1;
+            y1 = y2;
+            y2 = t;
+            //Math.swap(y1, y2);
+        }
+        int dx = x2 - x1;
+        int dy = y2 - y1;
+        int dError2 = Math.abs(dy) * 2;
+        int error2 = 0;
+        int y = y1;
+        for (int x = x1; x <= x2; x++) {
+            if (steep) {
+                set(y, x, color);
+            } else {
+                set(x, y, color);
+            }
+            error2 += dError2;
+            if (error2 > dx) {
+                y += (y2 > y1 ? 1 : -1);
+                error2 -= dx * 2;
+            }
+        }
+    }
 }
