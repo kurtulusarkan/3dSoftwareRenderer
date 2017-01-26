@@ -1,6 +1,8 @@
 package com.github.kurtulusarkan.softwarerenderer;
 
+import com.github.kurtulusarkan.softwarerenderer.obj.ObjModel;
 import com.github.kurtulusarkan.softwarerenderer.tga.TGAColor;
+import com.github.kurtulusarkan.softwarerenderer.tga.TGAHeader;
 import com.github.kurtulusarkan.softwarerenderer.tga.TGAImage;
 
 import java.io.IOException;
@@ -10,18 +12,47 @@ import java.io.IOException;
  */
 public class SoftwareRenderer {
 
+    private static int getFaceIndex(int face, int numItems) {
+        if (face > 0)
+            return face-1;
+        else
+            return numItems - Math.abs(face);
+    }
+
     public static void main(String[] args) throws IOException {
 
-        TGAColor b = new TGAColor(255, 0, 0, 255, 3);
+        ObjModel model = ObjModel.loadModelFromFile("data/african_head.obj");
 
+        TGAImage image = new TGAImage(800, 800, TGAHeader.BBP_RGB);
+        TGAColor white = new TGAColor(255, 255, 255, 255, TGAHeader.BBP_RGB);
 
-        // testing tga file read/write ops.
-        TGAImage image = new TGAImage(100, 100, 3);
+        int numVerts = model.numberOfVerts();
 
-        image.drawLine(13, 20, 80, 40, b);
-        image.drawLine(20, 13, 40, 80, b);
+        long l = System.currentTimeMillis();
 
-        image.writeToFile("output1.tga", false);
-        image.writeToFile("output2.tga", true);
+        for (int i = 0; i < model.numberOfFaces(); i++) {
+
+            int[] face = model.getFaces().get(i);
+
+            for (int j = 0; j < 3; j++) {
+
+                float[] v0 = model.getVerts().get(getFaceIndex(face[j], numVerts));
+                float[] v1 = model.getVerts().get(getFaceIndex(face[(j+1)%3], numVerts));
+
+                int x0 = (int)((v0[0]+1.0)*image.getWidth()/2.0);
+                int y0 = (int)((v0[1]+1.0)*image.getHeight()/2.0);
+
+                int x1 = (int)((v1[0]+1.0)*image.getWidth()/2.0);
+                int y1 = (int)((v1[1]+1.0)*image.getHeight()/2.0);
+
+                image.drawLine(x0, y0, x1, y1, white);
+            }
+        }
+
+        image.flipVertically();
+
+        System.out.println(System.currentTimeMillis() - l);
+
+        image.writeToFile("output.tga", true);
     }
 }

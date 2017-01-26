@@ -9,9 +9,9 @@ import java.nio.ByteOrder;
 public class TGAHeader {
 
     // supported BYTE per pixel values. (header contains BITS per pixel.)
-    static final int BBP_GRAYSCALE = 1;
-    static final int BBP_RGB = 3;
-    static final int BBP_RGBA = 4;
+    public static final int BBP_GRAYSCALE = 1;
+    public static final int BBP_RGB = 3;
+    public static final int BBP_RGBA = 4;
 
     // supported dataTypeCode values.
     static final byte DTC_UNCOMPRESSED_TRUECOLOR = (byte)2;
